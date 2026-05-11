@@ -3,6 +3,20 @@ import { ICONS, ACT_ICON } from '../components/icons';
 import { Spark, Ring, Pill, Stat, SectionH } from '../components/atoms';
 import type { Density, ActivityType } from '../types';
 import type { LogKind } from '../components/LogSheet';
+import {
+  ATHLETE_NAME,
+  DAYS_TO_RACE,
+  KCAL_TARGETS,
+  MACRO_TARGETS,
+  PLAN_DATA,
+  RACE,
+  TODAY_DATE,
+  TODAY_DAY,
+  TODAY_WEEK,
+  dateForDay,
+  dayKind,
+  formatShort,
+} from '../data/plan';
 
 type TodayProps = {
   density?: Density;
@@ -60,7 +74,7 @@ export function Today({ density = 'dense', onLog }: TodayProps) {
         <WeightCard onLog={onLog} />
       </div>
 
-      {showFueling && (
+      {showFueling && dayKind(TODAY_DAY) === 'long_ride' && (
         <div style={{ marginTop: 10, padding: '0 16px' }}>
           <FuelingCard />
         </div>
@@ -78,14 +92,14 @@ export function Today({ density = 'dense', onLog }: TodayProps) {
             }}
           >
             <Alert
-              tone="warn"
-              title="HRV trending low — 4d"
-              body="Below 30-day baseline. Threshold workout shifted to Thu."
+              tone="ok"
+              title="TT Test #1 tomorrow"
+              body="20-min flat TT sets your HR zones for the next 8 weeks. Pick a repeatable segment (Fiesta Island, SD River Trail)."
             />
             <Alert
               tone="ok"
-              title="FTP test scheduled"
-              body="Sun May 17 · 8:00. Last test 287W → ramp +2.4%/wk."
+              title="Day 1 of 168"
+              body="Base 1, 5.5 hrs this week. 80% time at Z2; only the Tue TT is hard."
             />
           </div>
         </div>
@@ -102,16 +116,18 @@ export function Today({ density = 'dense', onLog }: TodayProps) {
 }
 
 function Hero() {
+  const phaseName = TODAY_WEEK.phase.name;
   return (
     <div style={{ padding: '6px 16px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div className="cap" style={{ marginBottom: 4 }}>Sun · May 10</div>
+          <div className="cap" style={{ marginBottom: 4 }}>{formatShort(TODAY_DATE)}</div>
           <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-0.025em' }}>
-            Good morning, Theo.
+            Good morning, {ATHLETE_NAME}.
           </div>
           <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 1 }}>
-            Week 17 of 24 · <span style={{ color: 'var(--accent)' }}>Build phase</span>
+            Week {TODAY_WEEK.w} of 24 ·{' '}
+            <span style={{ color: 'var(--accent)' }}>{phaseName} phase</span>
           </div>
         </div>
       </div>
@@ -142,12 +158,12 @@ function Hero() {
           }}
         />
         <div>
-          <div className="cap" style={{ color: 'var(--accent)' }}>A-Race · T-27d</div>
+          <div className="cap" style={{ color: 'var(--accent)' }}>A-Race · T-{DAYS_TO_RACE}d</div>
           <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em', marginTop: 2 }}>
-            Mt Tam Century
+            {RACE.name}
           </div>
           <div className="num" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
-            Sat Jun 06 · 161 km · 2,950 m gain
+            {RACE.dateLabel} · {RACE.distanceKm} km · {RACE.elevationM.toLocaleString()} m gain
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -155,7 +171,7 @@ function Hero() {
             className="num"
             style={{ fontSize: 32, fontWeight: 500, letterSpacing: '-0.04em', lineHeight: 1 }}
           >
-            27
+            {DAYS_TO_RACE}
           </div>
           <div className="cap" style={{ marginTop: 4 }}>Days</div>
         </div>
@@ -164,18 +180,68 @@ function Hero() {
   );
 }
 
+const SESSION_KIND: Record<
+  ActivityType,
+  { label: string; icon: typeof ICONS.bike }
+> = {
+  ride: { label: 'Ride', icon: ICONS.bike },
+  lift: { label: 'Strength', icon: ICONS.lift },
+  yoga: { label: 'Mobility', icon: ICONS.yoga },
+  run: { label: 'Run', icon: ICONS.run },
+  rest: { label: 'Rest', icon: ICONS.rest },
+};
+
+function hoursLabel(tss: number): string {
+  const mins = Math.round((tss / 55) * 60);
+  return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m`;
+}
+
+function durationLabel(tss: number): string {
+  if (tss === 0) return '—';
+  if (tss >= 300) return '5h+';
+  if (tss >= 200) return '4h 15m';
+  if (tss >= 140) return '2h 30m';
+  if (tss >= 90) return '1h 45m';
+  if (tss >= 60) return '1h 15m';
+  if (tss >= 30) return '45m';
+  return '25m';
+}
+
+function sessionBlurb(day: typeof TODAY_DAY, weekN: number): string {
+  if (day.type === 'rest') {
+    return weekN === 1
+      ? 'Walk, mobility, hydrate. First benchmark TT lands Tuesday.'
+      : 'Walk, mobility, hydrate.';
+  }
+  if (day.type === 'yoga') return 'Mobility & active recovery.';
+  if (day.type === 'lift') return 'Posterior chain + core. Heavy-but-clean RPE 7.';
+  if (day.type === 'run') return 'Easy conversational Z2. Done if you could chat through it.';
+  if (day.name.startsWith('TT Test')) return 'Flat repeatable segment. Hard but sustainable for 20 min. Sets your zones.';
+  if (day.tss >= 280) return 'Long endurance on Highway 101. Eat 60-90g carbs/hr, sip steadily.';
+  if (day.tss >= 200) return 'Long Z2 on the coast. Fuel from minute 30.';
+  if (/Z4/.test(day.name)) return 'Threshold intervals — 95-100% LTHR, RPE 7-8. Recover fully between sets.';
+  if (/SS|Z3|tempo/i.test(day.name)) return 'Sweet-spot / tempo block. RPE 6-7. Just under threshold.';
+  return 'Z2 endurance. Conversational pace, smooth cadence.';
+}
+
 function SessionCard() {
+  const day = TODAY_DAY;
+  const kind = SESSION_KIND[day.type];
+  const Icon = kind.icon;
+  const isRest = day.type === 'rest';
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
       <div style={{ padding: '14px 14px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <Pill bg="var(--accent-soft)" color="var(--accent)">
-            <ICONS.bike s={10} /> Ride · Sweet spot
+            <Icon s={10} /> {kind.label}
           </Pill>
-          <Pill>2h 15m</Pill>
-          <Pill>TSS 142</Pill>
+          <Pill>{durationLabel(day.tss)}</Pill>
+          {day.tss > 0 && <Pill>TSS {day.tss}</Pill>}
           <div style={{ flex: 1 }} />
-          <span className="num" style={{ fontSize: 11, color: 'var(--ink-3)' }}>09:00</span>
+          {!isRest && (
+            <span className="num" style={{ fontSize: 11, color: 'var(--ink-3)' }}>09:00</span>
+          )}
         </div>
 
         <div
@@ -186,43 +252,11 @@ function SessionCard() {
             lineHeight: 1.15,
           }}
         >
-          4×12 @ 88-93% FTP
+          {day.name}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>
-          Marin Headlands loop · ~2,950 kJ · key build session
+          {sessionBlurb(day, TODAY_WEEK.w)}
         </div>
-      </div>
-
-      <div style={{ padding: '0 14px 12px' }}>
-        <PowerProfile />
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          borderTop: '1px solid var(--line)',
-        }}
-      >
-        {(
-          [
-            ['Power', '253', 'W avg'],
-            ['IF', '0.82', ''],
-            ['NP', '264', 'W'],
-            ['kJ', '2,940', ''],
-          ] as const
-        ).map(([l, v, u]) => (
-          <div key={l} style={{ padding: '10px 12px', borderRight: '1px solid var(--line)' }}>
-            <div className="cap" style={{ fontSize: 9 }}>{l}</div>
-            <div
-              className="num"
-              style={{ fontSize: 16, fontWeight: 500, marginTop: 2, letterSpacing: '-0.02em' }}
-            >
-              {v}
-            </div>
-            {u && <div className="num" style={{ fontSize: 9, color: 'var(--ink-3)' }}>{u}</div>}
-          </div>
-        ))}
       </div>
 
       <div style={{ display: 'flex', gap: 0 }}>
@@ -234,68 +268,10 @@ function SessionCard() {
           Details
         </button>
         <button type="button" style={btnDarkPrimary}>
-          Start workout <ICONS.chev s={12} />
+          {isRest ? 'Log recovery' : 'Start workout'} <ICONS.chev s={12} />
         </button>
       </div>
     </div>
-  );
-}
-
-function PowerProfile() {
-  const segs = [
-    { t: 12, p: 0.5, label: 'WU' },
-    { t: 12, p: 0.9, label: '#1' },
-    { t: 5, p: 0.55 },
-    { t: 12, p: 0.92, label: '#2' },
-    { t: 5, p: 0.55 },
-    { t: 12, p: 0.91, label: '#3' },
-    { t: 5, p: 0.55 },
-    { t: 12, p: 0.93, label: '#4' },
-    { t: 8, p: 0.45, label: 'CD' },
-  ];
-  const total = segs.reduce((a, b) => a + b.t, 0);
-  const W = 320;
-  const H = 50;
-  let x = 0;
-  return (
-    <svg
-      width="100%"
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      style={{ display: 'block' }}
-    >
-      {[0.5, 1].map((y) => (
-        <line
-          key={y}
-          x1={0}
-          x2={W}
-          y1={H - y * H}
-          y2={H - y * H}
-          stroke="var(--line)"
-          strokeWidth="0.5"
-          strokeDasharray="2 2"
-        />
-      ))}
-      {segs.map((s, i) => {
-        const w = (s.t / total) * W;
-        const h = s.p * H;
-        const isHard = s.p > 0.7;
-        const r = (
-          <rect
-            key={i}
-            x={x}
-            y={H - h}
-            width={Math.max(0.4, w - 0.6)}
-            height={h}
-            fill={isHard ? 'var(--accent)' : 'var(--line-3)'}
-            opacity={isHard ? 0.85 : 0.7}
-            rx="1"
-          />
-        );
-        x += w;
-        return r;
-      })}
-    </svg>
   );
 }
 
@@ -340,17 +316,20 @@ type WeekDay = {
 };
 
 function WeekStrip() {
-  const days: WeekDay[] = [
-    { d: 'M', n: 4, type: 'rest', tss: 0, done: true },
-    { d: 'T', n: 5, type: 'ride', tss: 78, done: true, label: '1h Z2' },
-    { d: 'W', n: 6, type: 'lift', tss: 35, done: true, label: 'Lift A' },
-    { d: 'T', n: 7, type: 'ride', tss: 95, done: true, label: 'VO2' },
-    { d: 'F', n: 8, type: 'yoga', tss: 18, done: true, label: 'Mobility' },
-    { d: 'S', n: 9, type: 'ride', tss: 215, done: true, label: '4h endurance' },
-    { d: 'S', n: 10, type: 'ride', tss: 142, today: true, label: 'Sweet spot' },
-  ];
-  const target = 580;
-  const completed = 401;
+  const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
+  const days: WeekDay[] = TODAY_WEEK.days.map((pd, i) => ({
+    d: LETTERS[i],
+    n: dateForDay(TODAY_WEEK.w, i).getUTCDate(),
+    type: pd.type,
+    tss: pd.tss,
+    done: pd.completed,
+    today: pd.today,
+    label: pd.name,
+  }));
+  const target = TODAY_WEEK.days.reduce((a, b) => a + b.tss, 0);
+  const completed = TODAY_WEEK.days
+    .filter((d) => d.completed)
+    .reduce((a, b) => a + b.tss, 0);
 
   return (
     <div>
@@ -380,7 +359,9 @@ function WeekStrip() {
             </span>
           </div>
         </div>
-        <div className="num" style={{ fontSize: 11, color: 'var(--ink-3)' }}>11h 24m / 14h</div>
+        <div className="num" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+          {hoursLabel(completed)} / {hoursLabel(target)}
+        </div>
       </div>
 
       <div style={{ padding: '0 16px', marginBottom: 12 }}>
@@ -670,12 +651,14 @@ function RecCard({ icon, label, value, unit, delta, deltaTone, spark, baseline }
 }
 
 function MacrosCard({ onLog }: { onLog: (k: LogKind) => void }) {
-  const cals = 1640;
-  const calsTarget = 3850;
+  const kind = dayKind(TODAY_DAY);
+  const calsTarget = KCAL_TARGETS[kind];
+  const m = MACRO_TARGETS[kind];
+  const cals = 0;
   const macros = [
-    { label: 'P', value: 142, target: 165, color: 'var(--accent)' },
-    { label: 'C', value: 184, target: 520, color: 'oklch(0.78 0.16 90)' },
-    { label: 'F', value: 56, target: 105, color: 'oklch(0.7 0.16 240)' },
+    { label: 'P', value: 0, target: m.protein, color: 'var(--accent)' },
+    { label: 'C', value: 0, target: m.carbs, color: 'oklch(0.78 0.16 90)' },
+    { label: 'F', value: 0, target: m.fat, color: 'oklch(0.7 0.16 240)' },
   ];
   return (
     <div className="card" style={{ padding: 12 }}>
@@ -906,11 +889,23 @@ type Next3Item = {
 };
 
 function Next3() {
-  const items: Next3Item[] = [
-    { d: 'Mon', n: 11, type: 'rest', name: 'Rest', desc: 'Walk + mobility', tss: 0 },
-    { d: 'Tue', n: 12, type: 'ride', name: 'VO₂ 5×4', desc: '110-120% FTP · 1h 15m', tss: 105 },
-    { d: 'Wed', n: 13, type: 'lift', name: 'Lower B', desc: 'Squat 4×5 · 1h', tss: 38 },
-  ];
+  const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const items: Next3Item[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const totalIdx = (TODAY_WEEK.w - 1) * 7 + PLAN_DATA.today.d + i;
+    const w = Math.floor(totalIdx / 7) + 1;
+    const d = totalIdx % 7;
+    if (w > 24) break;
+    const pd = PLAN_DATA.weeks[w - 1].days[d];
+    items.push({
+      d: DOW[d],
+      n: dateForDay(w, d).getUTCDate(),
+      type: pd.type,
+      name: pd.name,
+      desc: durationLabel(pd.tss),
+      tss: pd.tss,
+    });
+  }
   return (
     <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
       {items.map((it, i) => {
