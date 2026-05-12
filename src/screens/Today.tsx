@@ -17,13 +17,15 @@ import {
   dayKind,
   formatShort,
 } from '../data/plan';
+import { useWorkoutLog } from '../data/workoutLog';
 
 type TodayProps = {
   density?: Density;
   onLog: (kind: LogKind) => void;
+  onLogWorkout: (w: number, d: number) => void;
 };
 
-export function Today({ density = 'dense', onLog }: TodayProps) {
+export function Today({ density = 'dense', onLog, onLogWorkout }: TodayProps) {
   const showWeek = density !== 'minimal';
   const showLoad = density === 'dense';
   const showRecovery = density !== 'minimal';
@@ -36,12 +38,12 @@ export function Today({ density = 'dense', onLog }: TodayProps) {
       <Hero />
 
       <div style={{ padding: '0 16px', marginTop: 18 }}>
-        <SessionCard />
+        <SessionCard onLogWorkout={onLogWorkout} />
       </div>
 
       {showWeek && (
         <div style={{ marginTop: 18 }}>
-          <WeekStrip />
+          <WeekStrip onLogWorkout={onLogWorkout} />
         </div>
       )}
 
@@ -224,11 +226,13 @@ function sessionBlurb(day: typeof TODAY_DAY, weekN: number): string {
   return 'Z2 endurance. Conversational pace, smooth cadence.';
 }
 
-function SessionCard() {
+function SessionCard({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => void }) {
   const day = TODAY_DAY;
   const kind = SESSION_KIND[day.type];
   const Icon = kind.icon;
   const isRest = day.type === 'rest';
+  const { getEntry } = useWorkoutLog();
+  const logged = getEntry(TODAY_WEEK.w, PLAN_DATA.today.d);
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
       <div style={{ padding: '14px 14px 12px' }}>
@@ -267,8 +271,13 @@ function SessionCard() {
         >
           Details
         </button>
-        <button type="button" style={btnDarkPrimary}>
-          {isRest ? 'Log recovery' : 'Start workout'} <ICONS.chev s={12} />
+        <button
+          type="button"
+          style={btnDarkPrimary}
+          onClick={() => onLogWorkout(TODAY_WEEK.w, PLAN_DATA.today.d)}
+        >
+          {logged ? 'Edit log' : isRest ? 'Log recovery' : 'Log workout'}{' '}
+          <ICONS.chev s={12} />
         </button>
       </div>
     </div>
@@ -315,21 +324,20 @@ type WeekDay = {
   label?: string;
 };
 
-function WeekStrip() {
+function WeekStrip({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => void }) {
   const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
+  const { getEntry } = useWorkoutLog();
   const days: WeekDay[] = TODAY_WEEK.days.map((pd, i) => ({
     d: LETTERS[i],
     n: dateForDay(TODAY_WEEK.w, i).getUTCDate(),
     type: pd.type,
     tss: pd.tss,
-    done: pd.completed,
+    done: !!getEntry(TODAY_WEEK.w, i),
     today: pd.today,
     label: pd.name,
   }));
   const target = TODAY_WEEK.days.reduce((a, b) => a + b.tss, 0);
-  const completed = TODAY_WEEK.days
-    .filter((d) => d.completed)
-    .reduce((a, b) => a + b.tss, 0);
+  const completed = days.filter((x) => x.done).reduce((a, b) => a + b.tss, 0);
 
   return (
     <div>
@@ -392,8 +400,10 @@ function WeekStrip() {
           const I = ACT_ICON[d.type] ?? ICONS.rest;
           const isToday = d.today;
           return (
-            <div
+            <button
               key={i}
+              type="button"
+              onClick={() => onLogWorkout(TODAY_WEEK.w, i)}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -404,6 +414,9 @@ function WeekStrip() {
                 background: isToday ? 'var(--accent-glow)' : 'var(--bg-1)',
                 gap: 6,
                 position: 'relative',
+                cursor: 'pointer',
+                font: 'inherit',
+                color: 'inherit',
               }}
             >
               <div
@@ -449,7 +462,7 @@ function WeekStrip() {
                   }}
                 />
               )}
-            </div>
+            </button>
           );
         })}
       </div>

@@ -1,0 +1,53 @@
+# centurian-cyclist
+
+Personal training tracker for **Bike the Coast 100** (Oceanside CA, Oct 24 2026). Renders a 24-week polarized plan, lets you log workouts against it, and computes day-type macros (rest / quality / long ride).
+
+Single-user, no backend, deploys to GitHub Pages as a PWA-ready static site.
+
+## Development
+
+```bash
+pnpm install
+pnpm dev          # http://localhost:5173/centurian-cyclist/
+pnpm build        # tsc -b && vite build
+pnpm typecheck    # tsc -b --noEmit
+pnpm preview      # serve dist/
+```
+
+Node 22 / pnpm 10.
+
+## Project layout
+
+```
+src/
+  data/
+    plan.ts            # 24-week SEEDS, race/athlete metadata, date helpers
+    workoutLog.tsx     # React Context for in-memory workout log entries
+  screens/
+    Today.tsx          # Hero, today's session, week strip, macros, fueling
+    Calendar.tsx       # Week / Agenda / Heat views; tap any day to log
+    Plan.tsx           # 24-week browser (read-only)
+    Body.tsx           # Weight + benchmark TT (placeholders)
+  components/
+    LogSheet.tsx       # Meal + weight log sheets
+    WorkoutSheet.tsx   # Workout log sheet (status, RPE, duration, HR, notes)
+    icons.tsx          # Inline SVG icon set
+    atoms.tsx          # Spark, Ring, Pill, Stat, SectionH
+  theme/
+    accent.ts          # accent presets (green/orange/yellow/blue/white)
+  styles.css           # design tokens
+  App.tsx              # tab shell + sheet host + provider
+  main.tsx             # entry
+```
+
+## Deployment
+
+Pushes to `main` trigger `.github/workflows/pages.yml`, which builds with pnpm and publishes `dist/` to GitHub Pages at `https://centrifugalbadger.github.io/centurian-cyclist/`. The workflow self-enables Pages (`enablement: true` on `actions/configure-pages@v5`), so no manual repo settings are required.
+
+## Plan editing
+
+The 24-week plan lives as one `SEEDS` array in `src/data/plan.ts`. Each row is 7 tuples (Mon..Sun) of `[type, tss, name]`. Edits to that array flow through to the Calendar, Today, and Plan screens automatically.
+
+## Status
+
+Phase-1 scaffold. Workout logging is in-memory; persistence, day-shifting, and the body-screen benchmark view are the next milestones (see `CLAUDE.md` for the roadmap).
