@@ -1,13 +1,25 @@
 import type { CSSProperties } from 'react';
 import { ICONS } from '../components/icons';
-import { HBar, Pill, Spark, SectionH } from '../components/atoms';
+import { Spark, SectionH } from '../components/atoms';
 import type { LogKind } from '../components/LogSheet';
+import {
+  ATHLETE_NAME,
+  BENCHMARK_WEEKS,
+  PLAN_DATA,
+  WEIGHT_START_LB,
+  WEIGHT_TARGET_LB,
+  dateForDay,
+  formatShort,
+  type BenchmarkWeek,
+} from '../data/plan';
+import { useWeightLog, type WeightEntry } from '../data/weightLog';
+import { useWorkoutLog, type WorkoutEntry } from '../data/workoutLog';
 
 export function Body({ onLog }: { onLog: (k: LogKind) => void }) {
   return (
     <div style={{ paddingBottom: 28 }}>
       <div style={{ padding: '8px 16px 0' }}>
-        <div className="cap">Athlete · 32 yr · 178 cm</div>
+        <div className="cap">Athlete · {ATHLETE_NAME}</div>
         <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-0.025em', marginTop: 2 }}>
           Body
         </div>
@@ -15,83 +27,14 @@ export function Body({ onLog }: { onLog: (k: LogKind) => void }) {
 
       <div style={{ padding: '14px 16px 0' }}>
         <div className="card" style={{ padding: 14 }}>
-          <BodyHero onLog={onLog} />
+          <WeightHero onLog={onLog} />
         </div>
       </div>
 
       <div style={{ marginTop: 22 }}>
-        <SectionH kicker="Trends · 90d" action="All →">Vitals</SectionH>
-        <div
-          style={{
-            padding: '0 16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}
-        >
-          <TrendRow
-            label="Resting HR"
-            value="51"
-            unit="bpm"
-            delta="−3 / 90d"
-            tone="ok"
-            data={Array.from(
-              { length: 90 },
-              (_, i) => 54 - i * 0.03 + Math.sin(i / 5) * 1.5,
-            )}
-          />
-          <TrendRow
-            label="HRV (rMSSD)"
-            value="48"
-            unit="ms"
-            delta="−2 / 14d"
-            tone="warn"
-            data={Array.from(
-              { length: 90 },
-              (_, i) => 45 + i * 0.05 + Math.sin(i / 4) * 4 - (i > 75 ? 4 : 0),
-            )}
-          />
-          <TrendRow
-            label="Sleep"
-            value="7:24"
-            unit="avg"
-            delta="+18m / 90d"
-            tone="ok"
-            data={Array.from(
-              { length: 90 },
-              (_, i) => 7 + Math.sin(i / 7) * 0.7 + i * 0.005,
-            )}
-          />
-          <TrendRow
-            label="Body fat"
-            value="12.4"
-            unit="%"
-            delta="−1.8 / 90d"
-            tone="ok"
-            data={Array.from(
-              { length: 90 },
-              (_, i) => 14.2 - i * 0.02 + Math.sin(i / 9) * 0.3,
-            )}
-          />
-        </div>
-      </div>
-
-      <div style={{ marginTop: 22 }}>
-        <SectionH kicker="Personal records">Benchmarks</SectionH>
-        <div
-          style={{
-            padding: '0 16px',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 8,
-          }}
-        >
-          <BenchCell label="FTP" value="287" unit="W" sub="3.90 W/kg" tag="PR · 2d" />
-          <BenchCell label="20-min" value="302" unit="W" sub="4.10 W/kg" tag="PR · 2d" />
-          <BenchCell label="5-min" value="412" unit="W" sub="5.60 W/kg" tag="48d" />
-          <BenchCell label="1-min" value="624" unit="W" sub="8.48 W/kg" tag="71d" />
-          <BenchCell label="Squat 1RM" value="142" unit="kg" sub="1.93 BW" tag="14d" />
-          <BenchCell label="VO₂max" value="62.4" unit="ml/kg" sub="estimate" tag="lab" />
+        <SectionH kicker="20-min TT · zone calibration">Benchmarks</SectionH>
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <BenchmarkTable />
         </div>
       </div>
 
@@ -114,40 +57,45 @@ export function Body({ onLog }: { onLog: (k: LogKind) => void }) {
   );
 }
 
-const quickBtn: CSSProperties = {
-  padding: '14px',
-  background: 'var(--bg-1)',
-  border: '1px solid var(--line)',
-  color: 'var(--ink)',
-  borderRadius: 12,
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
-};
+function WeightHero({ onLog }: { onLog: (k: LogKind) => void }) {
+  const { entries, latest, rollingAvg } = useWeightLog();
+  const last = latest();
+  const cur = last?.weightLb ?? WEIGHT_START_LB;
+  const avg7 = rollingAvg(7);
+  const totalLoss = WEIGHT_START_LB - cur;
+  const totalToGo = cur - WEIGHT_TARGET_LB;
+  const range = WEIGHT_START_LB - WEIGHT_TARGET_LB;
+  const progressPct = Math.max(0, Math.min(100, (totalLoss / range) * 100));
 
-function BodyHero({ onLog }: { onLog: (k: LogKind) => void }) {
+  // sparkline data: pad with WEIGHT_START_LB so the line always has shape.
+  const sparkData = entries.length > 0
+    ? entries.map((e) => e.weightLb)
+    : [WEIGHT_START_LB, WEIGHT_START_LB];
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14 }}>
         <div>
-          <div className="cap">Weight · today</div>
+          <div className="cap">Weight · {last ? formatShort(new Date(`${last.date}T00:00:00Z`)) : 'not logged'}</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
             <span
               className="num"
               style={{ fontSize: 32, fontWeight: 500, letterSpacing: '-0.03em' }}
             >
-              73.6
+              {cur.toFixed(1)}
             </span>
-            <span className="num" style={{ fontSize: 13, color: 'var(--ink-3)' }}>kg</span>
+            <span className="num" style={{ fontSize: 13, color: 'var(--ink-3)' }}>lb</span>
           </div>
-          <div className="num" style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
-            −1.2 kg · 14d ↘ on track
-          </div>
+          {last && totalLoss > 0 && (
+            <div className="num" style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
+              −{totalLoss.toFixed(1)} lb from start
+            </div>
+          )}
+          {!last && (
+            <div className="num" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+              No entries yet — tap Log to start
+            </div>
+          )}
         </div>
         <div style={{ flex: 1 }} />
         <button
@@ -172,11 +120,23 @@ function BodyHero({ onLog }: { onLog: (k: LogKind) => void }) {
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span className="cap">Target · race weight</span>
-          <span className="num" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
-            72.0 kg / Jun 06
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginBottom: 4,
+            fontSize: 10,
+            color: 'var(--ink-3)',
+            fontFamily: 'var(--font-mono)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+          }}
+        >
+          <span>{WEIGHT_START_LB} start</span>
+          <span>
+            {totalToGo > 0 ? `${totalToGo.toFixed(1)} lb to go` : 'at target'}
           </span>
+          <span>{WEIGHT_TARGET_LB} target</span>
         </div>
         <div
           style={{
@@ -193,136 +153,210 @@ function BodyHero({ onLog }: { onLog: (k: LogKind) => void }) {
               left: 0,
               top: 0,
               bottom: 0,
-              width: '67%',
+              width: `${progressPct}%`,
               background: 'var(--accent)',
             }}
           />
         </div>
       </div>
 
-      <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
-        <div className="cap" style={{ marginBottom: 8 }}>Composition</div>
-        <HBar
-          segs={[
-            { value: 64.5, color: 'var(--accent)' },
-            { value: 9.1, color: 'oklch(0.78 0.16 90)' },
-          ]}
-        />
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginTop: 6,
-            fontSize: 10,
-            fontFamily: 'var(--font-mono)',
-            color: 'var(--ink-3)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 10,
+            marginBottom: 10,
           }}
         >
-          <span>
-            <span style={{ color: 'var(--accent)' }}>●</span> Lean 64.5 kg · 87.6%
-          </span>
-          <span>
-            <span style={{ color: 'oklch(0.78 0.16 90)' }}>●</span> Fat 9.1 kg · 12.4%
-          </span>
+          <Stat label="7-day avg" value={avg7 !== undefined ? avg7.toFixed(1) : '—'} unit="lb" />
+          <Stat label="Entries" value={entries.length} />
+          <Stat
+            label="Projected"
+            value={projectRaceWeight(entries) ?? '—'}
+            unit={projectRaceWeight(entries) !== null ? 'lb' : ''}
+          />
+        </div>
+        <div style={{ color: 'var(--accent)' }}>
+          <Spark
+            data={sparkData}
+            width={300}
+            height={42}
+            stroke="currentColor"
+            fill
+            strokeWidth={1.4}
+            dot={entries.length < 8}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-type TrendRowProps = {
-  label: string;
-  value: string;
-  unit: string;
-  delta: string;
-  tone: 'ok' | 'warn';
-  data: number[];
-};
+function projectRaceWeight(entries: WeightEntry[]): string | null {
+  if (entries.length < 3) return null;
+  // simple linear fit over last up-to-28 entries; project to race day index
+  const tail = entries.slice(-28);
+  const n = tail.length;
+  const xs = tail.map((_, i) => i);
+  const ys = tail.map((e) => e.weightLb);
+  const xMean = xs.reduce((a, b) => a + b, 0) / n;
+  const yMean = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - xMean) * (ys[i] - yMean);
+    den += (xs[i] - xMean) ** 2;
+  }
+  if (den === 0) return ys[n - 1].toFixed(1);
+  const slope = num / den;
+  const intercept = yMean - slope * xMean;
+  // project to day n + race-day offset from last entry; we don't track day index here,
+  // so just project the trend ~120 days forward (conservative window from W1).
+  const projected = intercept + slope * (n + 120);
+  return projected.toFixed(1);
+}
 
-function TrendRow({ label, value, unit, delta, tone, data }: TrendRowProps) {
-  const c = tone === 'warn' ? 'var(--warn)' : 'var(--accent)';
+function Stat({
+  label,
+  value,
+  unit,
+}: {
+  label: string;
+  value: string | number;
+  unit?: string;
+}) {
+  return (
+    <div>
+      <div className="cap" style={{ fontSize: 9 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginTop: 2 }}>
+        <span
+          className="num"
+          style={{ fontSize: 16, fontWeight: 500, letterSpacing: '-0.02em' }}
+        >
+          {value}
+        </span>
+        {unit && (
+          <span className="num" style={{ fontSize: 9, color: 'var(--ink-3)' }}>{unit}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BenchmarkTable() {
+  const { getEntry } = useWorkoutLog();
+  const baselineEntry = getEntry(1, 1);
+  const baseline = workoutSpeed(baselineEntry);
+  return (
+    <>
+      {BENCHMARK_WEEKS.map((wk) => {
+        const entry = getEntry(wk, 1);
+        return (
+          <BenchmarkRow
+            key={wk}
+            wk={wk}
+            entry={entry}
+            baselineSpeedMph={baseline}
+            isBaseline={wk === 1}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function workoutSpeed(e: WorkoutEntry | undefined): number | null {
+  if (!e || !e.durationMin || !e.distanceMi) return null;
+  return e.distanceMi / (e.durationMin / 60);
+}
+
+function BenchmarkRow({
+  wk,
+  entry,
+  baselineSpeedMph,
+  isBaseline,
+}: {
+  wk: BenchmarkWeek;
+  entry: WorkoutEntry | undefined;
+  baselineSpeedMph: number | null;
+  isBaseline: boolean;
+}) {
+  const date = formatShort(dateForDay(wk, 1));
+  const day = PLAN_DATA.weeks[wk - 1].days[1];
+  const speed = workoutSpeed(entry);
+  const deltaSpeed =
+    speed !== null && baselineSpeedMph !== null && !isBaseline
+      ? speed - baselineSpeedMph
+      : null;
+
   return (
     <div
       className="card"
       style={{
-        padding: '11px 12px',
+        padding: '12px 14px',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
       }}
     >
-      <div style={{ width: 92 }}>
-        <div className="cap">{label}</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginTop: 2 }}>
-          <span
-            className="num"
-            style={{ fontSize: 16, fontWeight: 500, letterSpacing: '-0.02em' }}
-          >
-            {value}
-          </span>
-          <span className="num" style={{ fontSize: 9, color: 'var(--ink-3)' }}>{unit}</span>
+      <div style={{ width: 56 }}>
+        <div className="cap" style={{ fontSize: 9 }}>W{wk}</div>
+        <div className="num" style={{ fontSize: 13, fontWeight: 500, marginTop: 1 }}>
+          {date}
         </div>
       </div>
-      <div style={{ flex: 1, color: c, minWidth: 0 }}>
-        <Spark
-          data={data}
-          width={140}
-          height={28}
-          stroke="currentColor"
-          fill
-          strokeWidth={1.2}
-          dot={false}
-        />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{day.name}</div>
+        {entry ? (
+          <div className="num" style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>
+            {entry.avgHr ? `HR ${entry.avgHr}` : ''}
+            {entry.avgHr && (speed !== null || entry.rpe) ? ' · ' : ''}
+            {speed !== null ? `${speed.toFixed(1)} mph` : ''}
+            {speed !== null && entry.rpe ? ' · ' : ''}
+            {entry.rpe ? `RPE ${entry.rpe}` : ''}
+          </div>
+        ) : (
+          <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+            Pending — log the Tue session to populate
+          </div>
+        )}
       </div>
-      <div
-        className="num"
-        style={{ fontSize: 10, color: c, textAlign: 'right', minWidth: 56 }}
-      >
-        {delta}
+      <div style={{ width: 72, textAlign: 'right' }}>
+        {isBaseline && entry && (
+          <span className="cap" style={{ fontSize: 9, color: 'var(--accent)' }}>
+            Baseline
+          </span>
+        )}
+        {deltaSpeed !== null && (
+          <div
+            className="num"
+            style={{
+              fontSize: 11,
+              color: deltaSpeed >= 0 ? 'var(--accent)' : 'var(--warn)',
+            }}
+          >
+            {deltaSpeed >= 0 ? '+' : ''}
+            {deltaSpeed.toFixed(2)} mph
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-type BenchCellProps = {
-  label: string;
-  value: string;
-  unit: string;
-  sub: string;
-  tag: string;
+const quickBtn: CSSProperties = {
+  padding: '14px',
+  background: 'var(--bg-1)',
+  border: '1px solid var(--line)',
+  color: 'var(--ink)',
+  borderRadius: 12,
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
 };
-
-function BenchCell({ label, value, unit, sub, tag }: BenchCellProps) {
-  const isPR = tag.startsWith('PR');
-  return (
-    <div className="card" style={{ padding: 12 }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <span className="cap">{label}</span>
-        <Pill
-          color={isPR ? 'var(--accent)' : 'var(--ink-3)'}
-          bg={isPR ? 'var(--accent-soft)' : 'var(--bg-3)'}
-        >
-          {tag}
-        </Pill>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginTop: 6 }}>
-        <span
-          className="num"
-          style={{ fontSize: 19, fontWeight: 500, letterSpacing: '-0.02em' }}
-        >
-          {value}
-        </span>
-        <span className="num" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{unit}</span>
-      </div>
-      <div className="num" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 1 }}>
-        {sub}
-      </div>
-    </div>
-  );
-}

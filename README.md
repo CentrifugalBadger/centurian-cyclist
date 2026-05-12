@@ -23,11 +23,12 @@ src/
   data/
     plan.ts            # 24-week SEEDS, race/athlete metadata, date helpers
     workoutLog.tsx     # React Context for in-memory workout log entries
+    weightLog.tsx      # React Context for in-memory weight entries (lb)
   screens/
     Today.tsx          # Hero, today's session, week strip, macros, fueling
     Calendar.tsx       # Week / Agenda / Heat views; tap any day to log
     Plan.tsx           # 24-week browser (read-only)
-    Body.tsx           # Weight + benchmark TT (placeholders)
+    Body.tsx           # Weight tracker (start/target/7d avg/projection) + 4-TT comparison
   components/
     LogSheet.tsx       # Meal + weight log sheets
     WorkoutSheet.tsx   # Workout log sheet (status, RPE, duration, HR, notes)
@@ -50,4 +51,4 @@ The 24-week plan lives as one `SEEDS` array in `src/data/plan.ts`. Each row is 7
 
 ## Status
 
-Phase-1 scaffold. Workout logging is in-memory; persistence, day-shifting, and the body-screen benchmark view are the next milestones (see `CLAUDE.md` for the roadmap).
+Phase-1 scaffold. Workout logging, weight tracking, and the 4-TT benchmark comparison are live (all in-memory). Day-shifting and localStorage persistence are the remaining milestones — see `CLAUDE.md` for the roadmap.

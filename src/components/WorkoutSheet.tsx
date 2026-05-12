@@ -32,8 +32,11 @@ export function WorkoutSheet({
   const [durationMin, setDurationMin] = useState<string>(
     existing?.durationMin?.toString() ?? (day.tss > 0 ? durationGuess(day.tss).toString() : ''),
   );
+  const [distanceMi, setDistanceMi] = useState<string>(existing?.distanceMi?.toString() ?? '');
   const [avgHr, setAvgHr] = useState<string>(existing?.avgHr?.toString() ?? '');
   const [notes, setNotes] = useState<string>(existing?.notes ?? '');
+
+  const showDistance = day.type === 'ride' || day.type === 'run';
 
   const rpeRequired = status !== 'skipped';
   const canSave = !rpeRequired || (rpe !== undefined && rpe >= 1 && rpe <= 10);
@@ -43,6 +46,7 @@ export function WorkoutSheet({
       status,
       rpe: rpeRequired ? rpe : undefined,
       durationMin: durationMin ? Number(durationMin) : undefined,
+      distanceMi: showDistance && distanceMi ? Number(distanceMi) : undefined,
       avgHr: avgHr ? Number(avgHr) : undefined,
       notes: notes.trim() || undefined,
       savedAt: Date.now(),
@@ -132,13 +136,28 @@ export function WorkoutSheet({
             </>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: showDistance ? '1fr 1fr 1fr' : '1fr 1fr',
+              gap: 8,
+              marginBottom: 14,
+            }}
+          >
             <NumField
               label="Duration (min)"
               value={durationMin}
               onChange={setDurationMin}
               placeholder="—"
             />
+            {showDistance && (
+              <NumField
+                label="Distance (mi)"
+                value={distanceMi}
+                onChange={setDistanceMi}
+                placeholder="—"
+              />
+            )}
             <NumField label="Avg HR" value={avgHr} onChange={setAvgHr} placeholder="—" />
           </div>
 

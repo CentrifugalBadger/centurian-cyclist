@@ -8,6 +8,7 @@ import { Plan } from './screens/Plan';
 import { Body } from './screens/Body';
 import { applyAccent } from './theme/accent';
 import { WorkoutLogProvider } from './data/workoutLog';
+import { WeightLogProvider } from './data/weightLog';
 import type { AccentKey, Density } from './types';
 
 type TabKey = 'today' | 'cal' | 'plan' | 'body';
@@ -82,7 +83,8 @@ export function App() {
 
   return (
     <WorkoutLogProvider>
-      <div className="app">
+      <WeightLogProvider>
+        <div className="app">
         <div className="app-scroll">
           {tab === 'today' && (
             <Today density={density} onLog={onLog} onLogWorkout={onLogWorkout} />
@@ -123,7 +125,8 @@ export function App() {
             onClose={() => setWorkoutTarget(null)}
           />
         )}
-      </div>
+        </div>
+      </WeightLogProvider>
     </WorkoutLogProvider>
   );
 }
