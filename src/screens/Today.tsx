@@ -11,34 +11,42 @@ import {
   PLAN_DATA,
   RACE,
   TODAY_DATE,
-  TODAY_DAY,
   TODAY_WEEK,
   dateForDay,
   dayKind,
   formatShort,
+  type PlanDay,
 } from '../data/plan';
 import { useWorkoutLog } from '../data/workoutLog';
+import { useSwaps } from '../data/swaps';
 
 type TodayProps = {
   density?: Density;
   onLog: (kind: LogKind) => void;
   onLogWorkout: (w: number, d: number) => void;
+  onMoveWorkout: (w: number, effD: number) => void;
 };
 
-export function Today({ density = 'dense', onLog, onLogWorkout }: TodayProps) {
+export function Today({ density = 'dense', onLog, onLogWorkout, onMoveWorkout }: TodayProps) {
   const showWeek = density !== 'minimal';
   const showLoad = density === 'dense';
   const showRecovery = density !== 'minimal';
   const showAlerts = density !== 'minimal';
   const showNext3 = density === 'dense';
   const showFueling = density === 'dense';
+  const { effectiveDay } = useSwaps();
+  const todayEff = effectiveDay(TODAY_WEEK.w, PLAN_DATA.today.d);
 
   return (
     <div style={{ paddingBottom: 28 }}>
       <Hero />
 
       <div style={{ padding: '0 16px', marginTop: 18 }}>
-        <SessionCard onLogWorkout={onLogWorkout} />
+        <SessionCard
+          todayEff={todayEff}
+          onLogWorkout={onLogWorkout}
+          onMoveWorkout={onMoveWorkout}
+        />
       </div>
 
       {showWeek && (
@@ -76,7 +84,7 @@ export function Today({ density = 'dense', onLog, onLogWorkout }: TodayProps) {
         <WeightCard onLog={onLog} />
       </div>
 
-      {showFueling && dayKind(TODAY_DAY) === 'long_ride' && (
+      {showFueling && dayKind(todayEff) === 'long_ride' && (
         <div style={{ marginTop: 10, padding: '0 16px' }}>
           <FuelingCard />
         </div>
@@ -209,7 +217,7 @@ function durationLabel(tss: number): string {
   return '25m';
 }
 
-function sessionBlurb(day: typeof TODAY_DAY, weekN: number): string {
+function sessionBlurb(day: PlanDay, weekN: number): string {
   if (day.type === 'rest') {
     return weekN === 1
       ? 'Walk, mobility, hydrate. First benchmark TT lands Tuesday.'
@@ -226,13 +234,24 @@ function sessionBlurb(day: typeof TODAY_DAY, weekN: number): string {
   return 'Z2 endurance. Conversational pace, smooth cadence.';
 }
 
-function SessionCard({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => void }) {
-  const day = TODAY_DAY;
+function SessionCard({
+  todayEff,
+  onLogWorkout,
+  onMoveWorkout,
+}: {
+  todayEff: PlanDay;
+  onLogWorkout: (w: number, d: number) => void;
+  onMoveWorkout: (w: number, effD: number) => void;
+}) {
+  const day = todayEff;
   const kind = SESSION_KIND[day.type];
   const Icon = kind.icon;
   const isRest = day.type === 'rest';
   const { getEntry } = useWorkoutLog();
-  const logged = getEntry(TODAY_WEEK.w, PLAN_DATA.today.d);
+  const { plannedSlot, isSwapped } = useSwaps();
+  const planned = plannedSlot(TODAY_WEEK.w, PLAN_DATA.today.d);
+  const logged = getEntry(TODAY_WEEK.w, planned);
+  const moved = isSwapped(TODAY_WEEK.w) && planned !== PLAN_DATA.today.d;
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
       <div style={{ padding: '14px 14px 12px' }}>
@@ -263,8 +282,27 @@ function SessionCard({ onLogWorkout }: { onLogWorkout: (w: number, d: number) =>
         </div>
       </div>
 
+      {moved && (
+        <div
+          className="cap"
+          style={{
+            padding: '0 14px 8px',
+            color: 'var(--accent)',
+            fontSize: 9,
+          }}
+        >
+          Moved from original slot
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 0 }}>
-        <button type="button" style={btnDarkSecondary}>Move</button>
+        <button
+          type="button"
+          style={btnDarkSecondary}
+          onClick={() => onMoveWorkout(TODAY_WEEK.w, PLAN_DATA.today.d)}
+        >
+          Move
+        </button>
         <button
           type="button"
           style={{ ...btnDarkSecondary, borderLeft: '1px solid var(--line)' }}
@@ -274,7 +312,7 @@ function SessionCard({ onLogWorkout }: { onLogWorkout: (w: number, d: number) =>
         <button
           type="button"
           style={btnDarkPrimary}
-          onClick={() => onLogWorkout(TODAY_WEEK.w, PLAN_DATA.today.d)}
+          onClick={() => onLogWorkout(TODAY_WEEK.w, planned)}
         >
           {logged ? 'Edit log' : isRest ? 'Log recovery' : 'Log workout'}{' '}
           <ICONS.chev s={12} />
@@ -327,16 +365,22 @@ type WeekDay = {
 function WeekStrip({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => void }) {
   const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
   const { getEntry } = useWorkoutLog();
-  const days: WeekDay[] = TODAY_WEEK.days.map((pd, i) => ({
-    d: LETTERS[i],
-    n: dateForDay(TODAY_WEEK.w, i).getUTCDate(),
-    type: pd.type,
-    tss: pd.tss,
-    done: !!getEntry(TODAY_WEEK.w, i),
-    today: pd.today,
-    label: pd.name,
-  }));
-  const target = TODAY_WEEK.days.reduce((a, b) => a + b.tss, 0);
+  const { effectiveDay, plannedSlot } = useSwaps();
+  const days: (WeekDay & { plannedD: number })[] = Array.from({ length: 7 }, (_, i) => {
+    const pd = effectiveDay(TODAY_WEEK.w, i);
+    const planned = plannedSlot(TODAY_WEEK.w, i);
+    return {
+      d: LETTERS[i],
+      n: dateForDay(TODAY_WEEK.w, i).getUTCDate(),
+      type: pd.type,
+      tss: pd.tss,
+      done: !!getEntry(TODAY_WEEK.w, planned),
+      today: i === PLAN_DATA.today.d,
+      label: pd.name,
+      plannedD: planned,
+    };
+  });
+  const target = days.reduce((a, b) => a + b.tss, 0);
   const completed = days.filter((x) => x.done).reduce((a, b) => a + b.tss, 0);
 
   return (
@@ -403,7 +447,7 @@ function WeekStrip({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => v
             <button
               key={i}
               type="button"
-              onClick={() => onLogWorkout(TODAY_WEEK.w, i)}
+              onClick={() => onLogWorkout(TODAY_WEEK.w, d.plannedD)}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -664,7 +708,9 @@ function RecCard({ icon, label, value, unit, delta, deltaTone, spark, baseline }
 }
 
 function MacrosCard({ onLog }: { onLog: (k: LogKind) => void }) {
-  const kind = dayKind(TODAY_DAY);
+  const { effectiveDay } = useSwaps();
+  const eff = effectiveDay(TODAY_WEEK.w, PLAN_DATA.today.d);
+  const kind = dayKind(eff);
   const calsTarget = KCAL_TARGETS[kind];
   const m = MACRO_TARGETS[kind];
   const cals = 0;
@@ -903,13 +949,14 @@ type Next3Item = {
 
 function Next3() {
   const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const { effectiveDay } = useSwaps();
   const items: Next3Item[] = [];
   for (let i = 1; i <= 3; i++) {
     const totalIdx = (TODAY_WEEK.w - 1) * 7 + PLAN_DATA.today.d + i;
     const w = Math.floor(totalIdx / 7) + 1;
     const d = totalIdx % 7;
     if (w > 24) break;
-    const pd = PLAN_DATA.weeks[w - 1].days[d];
+    const pd = effectiveDay(w, d);
     items.push({
       d: DOW[d],
       n: dateForDay(w, d).getUTCDate(),

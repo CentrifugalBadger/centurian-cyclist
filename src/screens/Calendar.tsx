@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { ICONS, ACT_ICON } from '../components/icons';
 import { Stat } from '../components/atoms';
 import {
@@ -9,6 +9,7 @@ import {
   type PlanDay,
 } from '../data/plan';
 import { useWorkoutLog } from '../data/workoutLog';
+import { useSwaps } from '../data/swaps';
 
 export type CalendarMode = 'week' | 'agenda' | 'heat';
 
@@ -23,9 +24,10 @@ type CalendarProps = {
   mode?: CalendarMode;
   onModeChange: (m: CalendarMode) => void;
   onLogWorkout: (w: number, d: number) => void;
+  onMoveWorkout: (w: number, effD: number) => void;
 };
 
-export function Calendar({ mode = 'agenda', onModeChange, onLogWorkout }: CalendarProps) {
+export function Calendar({ mode = 'agenda', onModeChange, onLogWorkout, onMoveWorkout }: CalendarProps) {
   const today = dateForDay(TODAY_WEEK.w, PLAN_DATA.today.d);
   const headerLabel = `${MONTHS_LONG[today.getUTCMonth()]} ${today.getUTCFullYear()}`;
   return (
@@ -64,19 +66,26 @@ export function Calendar({ mode = 'agenda', onModeChange, onLogWorkout }: Calend
         </button>
       </div>
 
-      {mode === 'week' && <WeekMode onLogWorkout={onLogWorkout} />}
-      {mode === 'agenda' && <AgendaMode onLogWorkout={onLogWorkout} />}
+      {mode === 'week' && <WeekMode onLogWorkout={onLogWorkout} onMoveWorkout={onMoveWorkout} />}
+      {mode === 'agenda' && <AgendaMode onLogWorkout={onLogWorkout} onMoveWorkout={onMoveWorkout} />}
       {mode === 'heat' && <HeatMode onLogWorkout={onLogWorkout} />}
     </div>
   );
 }
 
-function WeekMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => void }) {
+function WeekMode({
+  onLogWorkout,
+  onMoveWorkout,
+}: {
+  onLogWorkout: (w: number, d: number) => void;
+  onMoveWorkout: (w: number, effD: number) => void;
+}) {
   const [selW, setSelW] = useState(TODAY_WEEK.w);
   const [selD, setSelD] = useState(PLAN_DATA.today.d);
   const week = PLAN_DATA.weeks[selW - 1];
-  const day = week.days[selD];
   const { getEntry } = useWorkoutLog();
+  const { effectiveDay, plannedSlot, isSwapped } = useSwaps();
+  const day = effectiveDay(selW, selD);
 
   return (
     <div>
@@ -126,10 +135,13 @@ function WeekMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => vo
           Week {selW} · {week.phase.name}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
-          {week.days.map((d, i) => {
+          {week.days.map((_, i) => {
+            const d = effectiveDay(selW, i);
             const I = ACT_ICON[d.type] ?? ICONS.rest;
             const active = i === selD;
-            const logged = !!getEntry(selW, i);
+            const planned = plannedSlot(selW, i);
+            const logged = !!getEntry(selW, planned);
+            const isTodayEff = selW === TODAY_WEEK.w && i === PLAN_DATA.today.d;
             return (
               <button
                 key={i}
@@ -138,7 +150,7 @@ function WeekMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => vo
                 style={{
                   background: active
                     ? 'var(--accent-glow)'
-                    : d.today
+                    : isTodayEff
                       ? 'var(--bg-3)'
                       : 'var(--bg-1)',
                   border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
@@ -184,7 +196,15 @@ function WeekMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => vo
       </div>
 
       <div style={{ padding: '14px 16px 0' }}>
-        <DayCard day={day} weekNum={selW} dayIdx={selD} onLogWorkout={onLogWorkout} />
+        <DayCard
+          day={day}
+          weekNum={selW}
+          dayIdx={selD}
+          plannedD={plannedSlot(selW, selD)}
+          isMoved={isSwapped(selW) && plannedSlot(selW, selD) !== selD}
+          onLogWorkout={onLogWorkout}
+          onMoveWorkout={onMoveWorkout}
+        />
       </div>
     </div>
   );
@@ -210,17 +230,23 @@ function DayCard({
   day,
   weekNum,
   dayIdx,
+  plannedD,
+  isMoved,
   onLogWorkout,
+  onMoveWorkout,
 }: {
   day: PlanDay;
   weekNum: number;
   dayIdx: number;
+  plannedD: number;
+  isMoved: boolean;
   onLogWorkout: (w: number, d: number) => void;
+  onMoveWorkout: (w: number, effD: number) => void;
 }) {
   const I = ACT_ICON[day.type] ?? ICONS.rest;
   const date = shortDate(weekNum, dayIdx);
   const { getEntry } = useWorkoutLog();
-  const logged = getEntry(weekNum, dayIdx);
+  const logged = getEntry(weekNum, plannedD);
 
   return (
     <div className="card" style={{ padding: 14 }}>
@@ -293,44 +319,82 @@ function DayCard({
             : 'Mobility & flexibility — 30 min'}
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => onLogWorkout(weekNum, dayIdx)}
-        style={{
-          marginTop: 12,
-          width: '100%',
-          padding: '10px',
-          background: 'var(--bg-3)',
-          border: '1px solid var(--line)',
-          color: 'var(--ink)',
-          borderRadius: 8,
-          fontFamily: 'var(--font-sans)',
-          fontSize: 12,
-          fontWeight: 500,
-          cursor: 'pointer',
-        }}
-      >
-        {logged ? 'Edit log →' : 'Log workout →'}
-      </button>
+      {isMoved && (
+        <div
+          className="cap"
+          style={{ marginTop: 10, fontSize: 9, color: 'var(--accent)' }}
+        >
+          Moved from original slot
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+        <button
+          type="button"
+          onClick={() => onMoveWorkout(weekNum, dayIdx)}
+          style={daySecondaryBtn}
+        >
+          Move
+        </button>
+        <button
+          type="button"
+          onClick={() => onLogWorkout(weekNum, plannedD)}
+          style={dayPrimaryBtn}
+        >
+          {logged ? 'Edit log →' : 'Log workout →'}
+        </button>
+      </div>
     </div>
   );
 }
+
+const daySecondaryBtn: CSSProperties = {
+  flex: 1,
+  padding: '10px',
+  background: 'var(--bg-2)',
+  border: '1px solid var(--line)',
+  color: 'var(--ink-2)',
+  borderRadius: 8,
+  fontFamily: 'var(--font-sans)',
+  fontSize: 12,
+  cursor: 'pointer',
+};
+
+const dayPrimaryBtn: CSSProperties = {
+  flex: 2,
+  padding: '10px',
+  background: 'var(--bg-3)',
+  border: '1px solid var(--line)',
+  color: 'var(--ink)',
+  borderRadius: 8,
+  fontFamily: 'var(--font-sans)',
+  fontSize: 12,
+  fontWeight: 500,
+  cursor: 'pointer',
+};
 
 type AgendaItem =
   | { kind: 'header'; week: (typeof PLAN_DATA.weeks)[number] }
   | { kind: 'day'; day: PlanDay; weekNum: number; dayIdx: number };
 
-function AgendaMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => void }) {
+function AgendaMode({
+  onLogWorkout,
+  onMoveWorkout,
+}: {
+  onLogWorkout: (w: number, d: number) => void;
+  onMoveWorkout: (w: number, effD: number) => void;
+}) {
   const startW = TODAY_WEEK.w;
   const startD = PLAN_DATA.today.d;
+  const { effectiveDay } = useSwaps();
   const items: AgendaItem[] = [];
   for (let w = startW; w <= 24; w++) {
     const week = PLAN_DATA.weeks[w - 1];
     items.push({ kind: 'header', week });
-    week.days.forEach((d, di) => {
-      if (w === startW && di < startD) return;
+    for (let di = 0; di < 7; di++) {
+      if (w === startW && di < startD) continue;
+      const d = effectiveDay(w, di);
       items.push({ kind: 'day', day: d, weekNum: w, dayIdx: di });
-    });
+    }
   }
 
   return (
@@ -377,6 +441,7 @@ function AgendaMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => 
             weekNum={it.weekNum}
             dayIdx={it.dayIdx}
             onLogWorkout={onLogWorkout}
+            onMoveWorkout={onMoveWorkout}
           />
         );
       })}
@@ -391,24 +456,30 @@ function AgendaRow({
   weekNum,
   dayIdx,
   onLogWorkout,
+  onMoveWorkout,
 }: {
   day: PlanDay;
   weekNum: number;
   dayIdx: number;
   onLogWorkout: (w: number, d: number) => void;
+  onMoveWorkout: (w: number, effD: number) => void;
 }) {
   const I = ACT_ICON[day.type] ?? ICONS.rest;
   const date = dateForDay(weekNum, dayIdx);
-  const isToday = day.today;
+  const isToday = weekNum === TODAY_WEEK.w && dayIdx === PLAN_DATA.today.d;
   const isRace = day.name === RACE_NAME;
   const { getEntry } = useWorkoutLog();
-  const logged = !!getEntry(weekNum, dayIdx);
+  const { plannedSlot, isSwapped } = useSwaps();
+  const planned = plannedSlot(weekNum, dayIdx);
+  const logged = !!getEntry(weekNum, planned);
   const isRest = day.type === 'rest';
+  const isMoved = isSwapped(weekNum) && planned !== dayIdx;
 
   return (
+    <div style={{ position: 'relative' }}>
     <button
       type="button"
-      onClick={() => onLogWorkout(weekNum, dayIdx)}
+      onClick={() => onLogWorkout(weekNum, planned)}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -485,14 +556,51 @@ function AgendaRow({
             Logged
           </div>
         )}
+        {isMoved && !logged && (
+          <div className="cap" style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>
+            Moved
+          </div>
+        )}
       </div>
       {!isRest && <ICONS.chev s={12} />}
     </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onMoveWorkout(weekNum, dayIdx);
+        }}
+        aria-label="Move workout"
+        style={moveTabBtn}
+      >
+        ⇆
+      </button>
+    </div>
   );
 }
 
+const moveTabBtn: CSSProperties = {
+  position: 'absolute',
+  top: 6,
+  right: 32,
+  width: 22,
+  height: 22,
+  borderRadius: 6,
+  background: 'transparent',
+  border: '1px solid var(--line)',
+  color: 'var(--ink-3)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 12,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  lineHeight: 1,
+};
+
 function HeatMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => void }) {
   const maxTss = 280;
+  const { effectiveDay, plannedSlot } = useSwaps();
 
   return (
     <div>
@@ -550,15 +658,18 @@ function HeatMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => vo
                 >
                   {w.w}
                 </div>
-                {w.days.map((d, i) => {
+                {w.days.map((_, i) => {
+                  const d = effectiveDay(w.w, i);
+                  const planned = plannedSlot(w.w, i);
                   const intensity = d.tss / maxTss;
                   const baseColor = w.phase.color;
-                  const isFuture = !d.past && !d.today;
+                  const isToday = w.w === TODAY_WEEK.w && i === PLAN_DATA.today.d;
+                  const isFuture = !d.past && !isToday;
                   return (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => onLogWorkout(w.w, i)}
+                      onClick={() => onLogWorkout(w.w, planned)}
                       aria-label={`Log ${d.name}`}
                       style={{
                         aspectRatio: '1',
@@ -570,7 +681,7 @@ function HeatMode({ onLogWorkout }: { onLogWorkout: (w: number, d: number) => vo
                             : isFuture
                               ? `color-mix(in oklch, ${baseColor} ${20 + intensity * 60}%, transparent)`
                               : `color-mix(in oklch, ${baseColor} ${30 + intensity * 70}%, var(--bg))`,
-                        border: d.today
+                        border: isToday
                           ? '1px solid var(--ink)'
                           : d.name === RACE_NAME
                             ? '1.5px solid var(--accent)'

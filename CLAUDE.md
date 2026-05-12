@@ -24,9 +24,13 @@ Single-user training tracker for Zaid's **Bike the Coast 100** (Oceanside CA, Sa
 
 ## State
 
-- `WorkoutLogProvider` in `src/data/workoutLog.tsx` holds per-(w,d) workout entries: status, rpe, durationMin, distanceMi, avgHr, notes, savedAt.
+- `WorkoutLogProvider` in `src/data/workoutLog.tsx` holds per-(w, plannedD) workout entries: status, rpe, durationMin, distanceMi, avgHr, notes, savedAt.
 - `WeightLogProvider` in `src/data/weightLog.tsx` holds an ascending array of `{ date: 'YYYY-MM-DD', weightLb, source, loggedAt }`. Exposes `latest()` and `rollingAvg(days)`.
-- Hooks: `useWorkoutLog()` → `{ getEntry, saveEntry, clearEntry }`, `useWeightLog()` → `{ entries, latest, rollingAvg, save, remove }`.
+- `SwapsProvider` in `src/data/swaps.tsx` holds per-week permutations σ where `σ[effectiveSlot] = plannedSlot`. Missing weeks default to identity. `swapBlocker(w, a, b)` enforces the "no 3 consecutive long-ride days" rule (PRD FR-4.5).
+- Hooks:
+  - `useWorkoutLog()` → `{ getEntry, saveEntry, clearEntry }`. **Keys are planned slots** — log entries stay attached to their workout regardless of swaps.
+  - `useWeightLog()` → `{ entries, latest, rollingAvg, save, remove }`.
+  - `useSwaps()` → `{ effectiveDay, plannedSlot, effectiveSlot, isSwapped, swapBlocker, swap, resetWeek }`. Components render off `effectiveDay(w, effD)` and log against `plannedSlot(w, effD)`.
 - **Nothing is persisted yet** — that's the final roadmap step.
 
 ## UI shape
@@ -37,6 +41,7 @@ Single-user training tracker for Zaid's **Bike the Coast 100** (Oceanside CA, Sa
 - `screens/Body.tsx` — Weight hero (start/target/7-day avg/projection/sparkline) backed by `useWeightLog`; benchmark TT comparison (W1/8/16/22) derived from `useWorkoutLog` entries on each Tue.
 - `components/LogSheet.tsx` — meal + weight bottom sheet. Weight form is wired to `useWeightLog` in lb (±1 / ±0.1 adjusters). Meal form is still mock content.
 - `components/WorkoutSheet.tsx` — workout log bottom sheet: status (Done/Partial/Modified/Skipped), RPE 1-10, duration, distance (ride/run only), avg HR, notes.
+- `components/SwapSheet.tsx` — "Move workout" bottom sheet: pick another day in the same week to swap with. Disabled targets show the blocking reason (e.g. "Would create 3 consecutive long rides"). Includes a "Reset week" action when the week has been swapped.
 
 ## Plan constants
 
@@ -60,10 +65,10 @@ Single-user training tracker for Zaid's **Bike the Coast 100** (Oceanside CA, Sa
 
 In progress, work-down order:
 
-1. ~~Workout detail / log flow~~ — merged. Calendar + Today both open the sheet; logged state shown in WeekStrip, Calendar grid, agenda row, day card.
-2. ~~Body screen with real targets~~ — merged. Weight hero in lb, 7-day rolling avg, race-day projection (linear fit, ≥3 entries), 4-TT comparison wired to the existing workout log (Tue W1/8/16/22).
-3. Day-shifting (swap two days in a week, dayType + macro move with it).
-4. Persistence — localStorage round-trip for workout log, weight, meals.
+1. ~~Workout detail / log flow~~ — merged.
+2. ~~Body screen with real targets~~ — merged.
+3. ~~Day-shifting~~ — merged. Within-week swap via the SwapSheet picker, triggered from Today SessionCard's "Move" button, Calendar Week-mode DayCard, and a small ⇆ button on each Calendar agenda row. Day-type and kcal target follow the workout automatically because all consumers render off `effectiveDay()`. The no-3-consecutive-long-rides constraint is enforced in `swapBlocker`.
+4. Persistence — localStorage round-trip for workout log, weight, meals, and swap permutations.
 
 ## Source PRD
 

@@ -365,7 +365,5 @@ export function formatShort(d: Date): string {
 
 export const TODAY_DATE = dateForDay(TODAY_W, TODAY_D);
 
-// Today's plan day shortcut.
-export const TODAY_DAY: PlanDay =
-  PLAN_DATA.weeks[TODAY_W - 1].days[TODAY_D];
+// Today's plan-week shortcut. Use useSwaps().effectiveDay for the actual workout shown today.
 export const TODAY_WEEK: PlanWeekRow = PLAN_DATA.weeks[TODAY_W - 1];

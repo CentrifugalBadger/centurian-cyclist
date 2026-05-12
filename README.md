@@ -22,8 +22,9 @@ Node 22 / pnpm 10.
 src/
   data/
     plan.ts            # 24-week SEEDS, race/athlete metadata, date helpers
-    workoutLog.tsx     # React Context for in-memory workout log entries
+    workoutLog.tsx     # React Context for in-memory workout log entries (keyed by planned slot)
     weightLog.tsx      # React Context for in-memory weight entries (lb)
+    swaps.tsx          # React Context for per-week day permutations (move workouts within a week)
   screens/
     Today.tsx          # Hero, today's session, week strip, macros, fueling
     Calendar.tsx       # Week / Agenda / Heat views; tap any day to log
@@ -32,6 +33,7 @@ src/
   components/
     LogSheet.tsx       # Meal + weight log sheets
     WorkoutSheet.tsx   # Workout log sheet (status, RPE, duration, HR, notes)
+    SwapSheet.tsx      # Move-workout sheet (pick another day in the same week)
     icons.tsx          # Inline SVG icon set
     atoms.tsx          # Spark, Ring, Pill, Stat, SectionH
   theme/
@@ -51,4 +53,4 @@ The 24-week plan lives as one `SEEDS` array in `src/data/plan.ts`. Each row is 7
 
 ## Status
 
-Phase-1 scaffold. Workout logging, weight tracking, and the 4-TT benchmark comparison are live (all in-memory). Day-shifting and localStorage persistence are the remaining milestones — see `CLAUDE.md` for the roadmap.
+Phase-1 scaffold. Workout logging, weight tracking, the 4-TT benchmark comparison, and within-week day-shifting are all live (all in-memory). LocalStorage persistence is the remaining milestone — see `CLAUDE.md` for the roadmap.
