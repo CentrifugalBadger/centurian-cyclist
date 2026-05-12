@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react';
 import { ICONS } from './components/icons';
 import { LogSheet, type LogKind } from './components/LogSheet';
 import { WorkoutSheet } from './components/WorkoutSheet';
+import { SwapSheet } from './components/SwapSheet';
 import { Today } from './screens/Today';
 import { Calendar, type CalendarMode } from './screens/Calendar';
 import { Plan } from './screens/Plan';
@@ -9,6 +10,7 @@ import { Body } from './screens/Body';
 import { applyAccent } from './theme/accent';
 import { WorkoutLogProvider } from './data/workoutLog';
 import { WeightLogProvider } from './data/weightLog';
+import { SwapsProvider } from './data/swaps';
 import type { AccentKey, Density } from './types';
 
 type TabKey = 'today' | 'cal' | 'plan' | 'body';
@@ -58,6 +60,7 @@ export function App() {
   const [calMode, setCalMode] = useState<CalendarMode>('agenda');
   const [logKind, setLogKind] = useState<LogKind | null>(null);
   const [workoutTarget, setWorkoutTarget] = useState<{ w: number; d: number } | null>(null);
+  const [swapTarget, setSwapTarget] = useState<{ w: number; effD: number } | null>(null);
   const [accent] = useState<AccentKey>(loadAccent);
   const [density] = useState<Density>(loadDensity);
 
@@ -80,20 +83,28 @@ export function App() {
 
   const onLog = (k: LogKind) => setLogKind(k);
   const onLogWorkout = (w: number, d: number) => setWorkoutTarget({ w, d });
+  const onMoveWorkout = (w: number, effD: number) => setSwapTarget({ w, effD });
 
   return (
-    <WorkoutLogProvider>
-      <WeightLogProvider>
-        <div className="app">
+    <SwapsProvider>
+      <WorkoutLogProvider>
+        <WeightLogProvider>
+          <div className="app">
         <div className="app-scroll">
           {tab === 'today' && (
-            <Today density={density} onLog={onLog} onLogWorkout={onLogWorkout} />
+            <Today
+              density={density}
+              onLog={onLog}
+              onLogWorkout={onLogWorkout}
+              onMoveWorkout={onMoveWorkout}
+            />
           )}
           {tab === 'cal' && (
             <Calendar
               mode={calMode}
               onModeChange={setCalMode}
               onLogWorkout={onLogWorkout}
+              onMoveWorkout={onMoveWorkout}
             />
           )}
           {tab === 'plan' && <Plan />}
@@ -125,8 +136,16 @@ export function App() {
             onClose={() => setWorkoutTarget(null)}
           />
         )}
-        </div>
-      </WeightLogProvider>
-    </WorkoutLogProvider>
+        {swapTarget && (
+          <SwapSheet
+            w={swapTarget.w}
+            effD={swapTarget.effD}
+            onClose={() => setSwapTarget(null)}
+          />
+        )}
+          </div>
+        </WeightLogProvider>
+      </WorkoutLogProvider>
+    </SwapsProvider>
   );
 }
