@@ -1,11 +1,13 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { ICONS } from './components/icons';
 import { LogSheet, type LogKind } from './components/LogSheet';
+import { WorkoutSheet } from './components/WorkoutSheet';
 import { Today } from './screens/Today';
 import { Calendar, type CalendarMode } from './screens/Calendar';
 import { Plan } from './screens/Plan';
 import { Body } from './screens/Body';
 import { applyAccent } from './theme/accent';
+import { WorkoutLogProvider } from './data/workoutLog';
 import type { AccentKey, Density } from './types';
 
 type TabKey = 'today' | 'cal' | 'plan' | 'body';
@@ -54,6 +56,7 @@ export function App() {
   const [tab, setTab] = useState<TabKey>('today');
   const [calMode, setCalMode] = useState<CalendarMode>('agenda');
   const [logKind, setLogKind] = useState<LogKind | null>(null);
+  const [workoutTarget, setWorkoutTarget] = useState<{ w: number; d: number } | null>(null);
   const [accent] = useState<AccentKey>(loadAccent);
   const [density] = useState<Density>(loadDensity);
 
@@ -75,34 +78,52 @@ export function App() {
   }, [density]);
 
   const onLog = (k: LogKind) => setLogKind(k);
+  const onLogWorkout = (w: number, d: number) => setWorkoutTarget({ w, d });
 
   return (
-    <div className="app">
-      <div className="app-scroll">
-        {tab === 'today' && <Today density={density} onLog={onLog} />}
-        {tab === 'cal' && <Calendar mode={calMode} onModeChange={setCalMode} />}
-        {tab === 'plan' && <Plan />}
-        {tab === 'body' && <Body onLog={onLog} />}
-      </div>
+    <WorkoutLogProvider>
+      <div className="app">
+        <div className="app-scroll">
+          {tab === 'today' && (
+            <Today density={density} onLog={onLog} onLogWorkout={onLogWorkout} />
+          )}
+          {tab === 'cal' && (
+            <Calendar
+              mode={calMode}
+              onModeChange={setCalMode}
+              onLogWorkout={onLogWorkout}
+            />
+          )}
+          {tab === 'plan' && <Plan />}
+          {tab === 'body' && <Body onLog={onLog} />}
+        </div>
 
-      <div className="tab-bar">
-        {TABS.map((t) => {
-          const Ic = t.icon;
-          return (
-            <button
-              key={t.k}
-              type="button"
-              onClick={() => setTab(t.k)}
-              className={`tab ${tab === t.k ? 'active' : ''}`}
-            >
-              <Ic s={20} />
-              <span className="tab-label">{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
+        <div className="tab-bar">
+          {TABS.map((t) => {
+            const Ic = t.icon;
+            return (
+              <button
+                key={t.k}
+                type="button"
+                onClick={() => setTab(t.k)}
+                className={`tab ${tab === t.k ? 'active' : ''}`}
+              >
+                <Ic s={20} />
+                <span className="tab-label">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      {logKind && <LogSheet kind={logKind} onClose={() => setLogKind(null)} />}
-    </div>
+        {logKind && <LogSheet kind={logKind} onClose={() => setLogKind(null)} />}
+        {workoutTarget && (
+          <WorkoutSheet
+            w={workoutTarget.w}
+            d={workoutTarget.d}
+            onClose={() => setWorkoutTarget(null)}
+          />
+        )}
+      </div>
+    </WorkoutLogProvider>
   );
 }
