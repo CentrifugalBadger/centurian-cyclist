@@ -24,16 +24,24 @@ Single-user training tracker for Zaid's **Bike the Coast 100** (Oceanside CA, Sa
 
 ## State
 
-- `WorkoutLogProvider` in `src/data/workoutLog.tsx` holds per-(w,d) workout entries: status, rpe, durationMin, avgHr, notes, savedAt.
-- `useWorkoutLog()` exposes `{ getEntry, saveEntry, clearEntry }`. **Not persisted yet** — that's the next step.
+- `WorkoutLogProvider` in `src/data/workoutLog.tsx` holds per-(w,d) workout entries: status, rpe, durationMin, distanceMi, avgHr, notes, savedAt.
+- `WeightLogProvider` in `src/data/weightLog.tsx` holds an ascending array of `{ date: 'YYYY-MM-DD', weightLb, source, loggedAt }`. Exposes `latest()` and `rollingAvg(days)`.
+- Hooks: `useWorkoutLog()` → `{ getEntry, saveEntry, clearEntry }`, `useWeightLog()` → `{ entries, latest, rollingAvg, save, remove }`.
+- **Nothing is persisted yet** — that's the final roadmap step.
 
 ## UI shape
 
 - `App.tsx` — root, 4 tabs (Today / Calendar / Plan / Body), accent + density loaded from localStorage.
-- `screens/Today.tsx` — Hero, SessionCard (today's workout, derived from plan), WeekStrip (tappable to open log), Load / Recovery / Macros / Fueling / Alerts / Next-3. Most non-plan cards are still placeholder values pending real metrics.
+- `screens/Today.tsx` — Hero, SessionCard (today's workout, derived from plan), WeekStrip (tappable to open log), Load / Recovery / Macros / Fueling / Alerts / Next-3. Load / Recovery / Alerts are still placeholder.
 - `screens/Calendar.tsx` — Week / Agenda / Heat modes. All three render real plan rows and open the WorkoutSheet on tap.
-- `components/LogSheet.tsx` — meal + weight bottom sheet. Still mostly mock content for now.
-- `components/WorkoutSheet.tsx` — workout log bottom sheet: status (Done/Partial/Modified/Skipped), RPE 1-10, duration, avg HR, notes.
+- `screens/Body.tsx` — Weight hero (start/target/7-day avg/projection/sparkline) backed by `useWeightLog`; benchmark TT comparison (W1/8/16/22) derived from `useWorkoutLog` entries on each Tue.
+- `components/LogSheet.tsx` — meal + weight bottom sheet. Weight form is wired to `useWeightLog` in lb (±1 / ±0.1 adjusters). Meal form is still mock content.
+- `components/WorkoutSheet.tsx` — workout log bottom sheet: status (Done/Partial/Modified/Skipped), RPE 1-10, duration, distance (ride/run only), avg HR, notes.
+
+## Plan constants
+
+- `WEIGHT_START_LB = 240`, `WEIGHT_TARGET_LB = 215` — PRD goal of 20-30 lb loss.
+- `BENCHMARK_WEEKS = [1, 8, 16, 22]` — the four 20-min TT calibration points.
 
 ## Conventions
 
@@ -52,8 +60,8 @@ Single-user training tracker for Zaid's **Bike the Coast 100** (Oceanside CA, Sa
 
 In progress, work-down order:
 
-1. ~~Workout detail / log flow~~ — done in PR (this branch). Calendar + Today both open the sheet; logged state shown in WeekStrip, Calendar grid, agenda row, day card.
-2. Body screen with real targets — weight start/target, 7-day rolling avg, 4-benchmark TT comparison (W1/8/16/22).
+1. ~~Workout detail / log flow~~ — merged. Calendar + Today both open the sheet; logged state shown in WeekStrip, Calendar grid, agenda row, day card.
+2. ~~Body screen with real targets~~ — merged. Weight hero in lb, 7-day rolling avg, race-day projection (linear fit, ≥3 entries), 4-TT comparison wired to the existing workout log (Tue W1/8/16/22).
 3. Day-shifting (swap two days in a week, dayType + macro move with it).
 4. Persistence — localStorage round-trip for workout log, weight, meals.
 

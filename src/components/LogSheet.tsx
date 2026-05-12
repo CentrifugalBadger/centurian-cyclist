@@ -1,7 +1,13 @@
 import { useState, type CSSProperties } from 'react';
 import { ICONS } from './icons';
+import { WEIGHT_START_LB, WEIGHT_TARGET_LB } from '../data/plan';
+import { useWeightLog } from '../data/weightLog';
 
 export type LogKind = 'weight' | 'meal';
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export function LogSheet({ kind, onClose }: { kind: LogKind; onClose: () => void }) {
   return (
@@ -17,9 +23,22 @@ export function LogSheet({ kind, onClose }: { kind: LogKind; onClose: () => void
 }
 
 function WeightLog({ onClose }: { onClose: () => void }) {
-  const [val, setVal] = useState(73.6);
+  const { latest, rollingAvg, save } = useWeightLog();
+  const last = latest();
+  const [val, setVal] = useState(last?.weightLb ?? WEIGHT_START_LB);
+  const avg = rollingAvg(7);
 
   const adj = (d: number) => setVal((v) => Math.round((v + d) * 10) / 10);
+
+  const onSave = () => {
+    save({
+      date: todayIso(),
+      weightLb: Math.round(val * 10) / 10,
+      source: 'manual',
+      loggedAt: Date.now(),
+    });
+    onClose();
+  };
 
   return (
     <div style={{ padding: '6px 20px 0' }}>
@@ -54,15 +73,16 @@ function WeightLog({ onClose }: { onClose: () => void }) {
           >
             {val.toFixed(1)}
           </span>
-          <span className="num" style={{ fontSize: 14, color: 'var(--ink-3)' }}>kg</span>
+          <span className="num" style={{ fontSize: 14, color: 'var(--ink-3)' }}>lb</span>
         </div>
         <div className="num" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>
-          Yesterday 73.7 · 7d avg 73.9 · target 72.0
+          {last ? `Last ${last.weightLb.toFixed(1)}` : `Start ${WEIGHT_START_LB}`}
+          {avg !== undefined ? ` · 7d avg ${avg.toFixed(1)}` : ''} · target {WEIGHT_TARGET_LB}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 14 }}>
-        {[-0.5, -0.1, +0.1, +0.5].map((d) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 18 }}>
+        {[-1, -0.1, +0.1, +1].map((d) => (
           <button key={d} onClick={() => adj(d)} style={adjBtn}>
             {d > 0 ? '+' : ''}
             {d.toFixed(1)}
@@ -70,31 +90,8 @@ function WeightLog({ onClose }: { onClose: () => void }) {
         ))}
       </div>
 
-      <div className="cap" style={{ marginBottom: 6 }}>Recorded</div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {['Now', 'On wake', 'Custom'].map((t, i) => (
-          <button
-            key={t}
-            type="button"
-            className={`btn-ghost ${i === 1 ? 'active' : ''}`}
-            style={{ flex: 1 }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div className="cap" style={{ marginBottom: 6 }}>Tag</div>
-      <div className="h-scroll" style={{ marginBottom: 18 }}>
-        {['Post-ride', 'Fasted', 'Post-meal', 'Travel', 'Sick'].map((t) => (
-          <button key={t} type="button" className="btn-ghost" style={{ flex: '0 0 auto' }}>
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <button onClick={onClose} style={savePrimaryBtn}>
-        Save · {val.toFixed(1)} kg
+      <button onClick={onSave} style={savePrimaryBtn}>
+        Save · {val.toFixed(1)} lb
       </button>
     </div>
   );

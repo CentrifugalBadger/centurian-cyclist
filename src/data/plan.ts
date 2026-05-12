@@ -317,6 +317,14 @@ export const RACE = {
   elevationM: 1005, // 3,300 ft on the published course
 };
 
+// Body composition reference (PRD: ~240 lb start, 20-30 lb target loss).
+export const WEIGHT_START_LB = 240;
+export const WEIGHT_TARGET_LB = 215;
+
+// The four 20-min benchmark TT weeks (Tue session in W1 / W8 / W16 / W22).
+export const BENCHMARK_WEEKS = [1, 8, 16, 22] as const;
+export type BenchmarkWeek = (typeof BENCHMARK_WEEKS)[number];
+
 export type DayKind = 'rest' | 'quality' | 'long_ride';
 
 export const KCAL_TARGETS: Record<DayKind, number> = {

@@ -13,6 +13,7 @@ export type WorkoutEntry = {
   status: WorkoutStatus;
   rpe?: number;
   durationMin?: number;
+  distanceMi?: number;
   avgHr?: number;
   notes?: string;
   savedAt: number;
