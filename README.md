@@ -22,9 +22,10 @@ Node 22 / pnpm 10.
 src/
   data/
     plan.ts            # 24-week SEEDS, race/athlete metadata, date helpers
-    workoutLog.tsx     # React Context for in-memory workout log entries (keyed by planned slot)
-    weightLog.tsx      # React Context for in-memory weight entries (lb)
-    swaps.tsx          # React Context for per-week day permutations (move workouts within a week)
+    storage.ts         # tiny localStorage wrapper (loadJson/saveJson, `cc.` key prefix)
+    workoutLog.tsx     # React Context for workout log entries (keyed by planned slot), persisted
+    weightLog.tsx      # React Context for weight entries (lb), persisted
+    swaps.tsx          # React Context for per-week day permutations, persisted
   screens/
     Today.tsx          # Hero, today's session, week strip, macros, fueling
     Calendar.tsx       # Week / Agenda / Heat views; tap any day to log
@@ -53,4 +54,12 @@ The 24-week plan lives as one `SEEDS` array in `src/data/plan.ts`. Each row is 7
 
 ## Status
 
-Phase-1 scaffold. Workout logging, weight tracking, the 4-TT benchmark comparison, and within-week day-shifting are all live (all in-memory). LocalStorage persistence is the remaining milestone — see `CLAUDE.md` for the roadmap.
+Phase-1 scaffold complete. Workout logging, weight tracking, the 4-TT benchmark comparison, within-week day-shifting, and localStorage persistence are all wired up. Phase-2 (meal logging, Apple Health ingest, benchmark chart, adjustment-trigger inbox) is outlined in `CLAUDE.md`.
+
+### Reset
+
+To wipe local state during dev, run this in the browser console:
+
+```js
+Object.keys(localStorage).filter(k => k.startsWith('cc.')).forEach(k => localStorage.removeItem(k))
+```

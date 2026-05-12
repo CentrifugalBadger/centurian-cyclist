@@ -24,14 +24,16 @@ Single-user training tracker for Zaid's **Bike the Coast 100** (Oceanside CA, Sa
 
 ## State
 
-- `WorkoutLogProvider` in `src/data/workoutLog.tsx` holds per-(w, plannedD) workout entries: status, rpe, durationMin, distanceMi, avgHr, notes, savedAt.
-- `WeightLogProvider` in `src/data/weightLog.tsx` holds an ascending array of `{ date: 'YYYY-MM-DD', weightLb, source, loggedAt }`. Exposes `latest()` and `rollingAvg(days)`.
-- `SwapsProvider` in `src/data/swaps.tsx` holds per-week permutations σ where `σ[effectiveSlot] = plannedSlot`. Missing weeks default to identity. `swapBlocker(w, a, b)` enforces the "no 3 consecutive long-ride days" rule (PRD FR-4.5).
+- `WorkoutLogProvider` in `src/data/workoutLog.tsx` holds per-(w, plannedD) workout entries: status, rpe, durationMin, distanceMi, avgHr, notes, savedAt. Persisted to `cc.workoutLog.v1`.
+- `WeightLogProvider` in `src/data/weightLog.tsx` holds an ascending array of `{ date: 'YYYY-MM-DD', weightLb, source, loggedAt }`. Exposes `latest()` and `rollingAvg(days)`. Persisted to `cc.weightLog.v1`.
+- `SwapsProvider` in `src/data/swaps.tsx` holds per-week permutations σ where `σ[effectiveSlot] = plannedSlot`. Missing weeks default to identity. `swapBlocker(w, a, b)` enforces the "no 3 consecutive long-ride days" rule (PRD FR-4.5). Persisted to `cc.swaps.v1`.
+- `src/data/storage.ts` — tiny `loadJson` / `saveJson` wrappers with try/catch and a `cc.` key prefix. Each provider reads once via `useState(() => loadJson(...))` and writes via `useEffect`.
 - Hooks:
   - `useWorkoutLog()` → `{ getEntry, saveEntry, clearEntry }`. **Keys are planned slots** — log entries stay attached to their workout regardless of swaps.
   - `useWeightLog()` → `{ entries, latest, rollingAvg, save, remove }`.
   - `useSwaps()` → `{ effectiveDay, plannedSlot, effectiveSlot, isSwapped, swapBlocker, swap, resetWeek }`. Components render off `effectiveDay(w, effD)` and log against `plannedSlot(w, effD)`.
-- **Nothing is persisted yet** — that's the final roadmap step.
+- Accent + density are persisted to `ct.accent` / `ct.density` (older key prefix; predates this work). Workout / weight / swaps use the newer `cc.` prefix.
+- Meals: still mock content in `LogSheet.tsx`'s `MealLog` — no real store, so nothing to persist there yet.
 
 ## UI shape
 
@@ -63,12 +65,23 @@ Single-user training tracker for Zaid's **Bike the Coast 100** (Oceanside CA, Sa
 
 ## Roadmap
 
-In progress, work-down order:
+Original Phase-1 list, all merged:
 
-1. ~~Workout detail / log flow~~ — merged.
-2. ~~Body screen with real targets~~ — merged.
-3. ~~Day-shifting~~ — merged. Within-week swap via the SwapSheet picker, triggered from Today SessionCard's "Move" button, Calendar Week-mode DayCard, and a small ⇆ button on each Calendar agenda row. Day-type and kcal target follow the workout automatically because all consumers render off `effectiveDay()`. The no-3-consecutive-long-rides constraint is enforced in `swapBlocker`.
-4. Persistence — localStorage round-trip for workout log, weight, meals, and swap permutations.
+1. ~~Workout detail / log flow~~
+2. ~~Body screen with real targets~~
+3. ~~Day-shifting~~ (within-week swap via the SwapSheet picker, no-3-consecutive-long-rides constraint).
+4. ~~Persistence~~ — workout log, weight, and swap permutations round-trip through localStorage; meals still mock.
+
+## What's next (PRD §11 Phase 2 territory)
+
+The scaffold is functionally complete for tracking the plan day-to-day. Roughly in priority order:
+
+- Meal logging with a real store (PRD §7.3 / FR-3) — currently the Quick/Search/Scan tabs are mock.
+- Apple Health Auto Export ingest endpoint (PRD §7.7 / FR-7.1) — needs a backend; not viable in this static-Pages setup. Either move to Vercel + Next.js (per PRD §8) or stay manual.
+- Benchmark TT comparison chart (currently a table; chart in PRD §7.6 / FR-6.2).
+- Adjustment-trigger inbox (PRD §7.8 / FR-9).
+- Cross-week day shifting (current swap is within-week only; PRD FR-4.6 hints at across-week).
+- Body-composition / HRV / RHR / sleep — needs real data source first.
 
 ## Source PRD
 

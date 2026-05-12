@@ -2,10 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
+import { loadJson, saveJson } from './storage';
 
 export type WorkoutStatus = 'completed' | 'partial' | 'skipped' | 'modified';
 
@@ -27,10 +29,17 @@ type Ctx = {
 
 const WorkoutLogContext = createContext<Ctx | null>(null);
 
+const STORAGE_KEY = 'workoutLog.v1';
 const key = (w: number, d: number) => `${w}:${d}`;
 
 export function WorkoutLogProvider({ children }: { children: ReactNode }) {
-  const [entries, setEntries] = useState<Record<string, WorkoutEntry>>({});
+  const [entries, setEntries] = useState<Record<string, WorkoutEntry>>(() =>
+    loadJson<Record<string, WorkoutEntry>>(STORAGE_KEY, {}),
+  );
+
+  useEffect(() => {
+    saveJson(STORAGE_KEY, entries);
+  }, [entries]);
 
   const getEntry = useCallback(
     (w: number, d: number) => entries[key(w, d)],
