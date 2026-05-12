@@ -2,10 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
+import { loadJson, saveJson } from './storage';
 
 export type WeightEntry = {
   date: string; // YYYY-MM-DD
@@ -13,6 +15,8 @@ export type WeightEntry = {
   source: 'manual' | 'health';
   loggedAt: number;
 };
+
+const STORAGE_KEY = 'weightLog.v1';
 
 type Ctx = {
   entries: WeightEntry[]; // sorted ascending by date
@@ -29,7 +33,13 @@ function sortByDate(a: WeightEntry, b: WeightEntry) {
 }
 
 export function WeightLogProvider({ children }: { children: ReactNode }) {
-  const [entries, setEntries] = useState<WeightEntry[]>([]);
+  const [entries, setEntries] = useState<WeightEntry[]>(() =>
+    loadJson<WeightEntry[]>(STORAGE_KEY, []),
+  );
+
+  useEffect(() => {
+    saveJson(STORAGE_KEY, entries);
+  }, [entries]);
 
   const save = useCallback((entry: WeightEntry) => {
     setEntries((prev) => {

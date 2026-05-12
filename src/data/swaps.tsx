@@ -2,15 +2,19 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
 import { PLAN_DATA, dayKind, type PlanDay } from './plan';
+import { loadJson, saveJson } from './storage';
 
 // Per-week permutation: σ[effectiveSlot] = plannedSlot.
 // A missing week means identity (no swaps).
 type SwapState = Record<number, number[]>;
+
+const STORAGE_KEY = 'swaps.v1';
 
 const IDENTITY: readonly number[] = [0, 1, 2, 3, 4, 5, 6];
 
@@ -54,7 +58,13 @@ type Ctx = {
 const SwapsContext = createContext<Ctx | null>(null);
 
 export function SwapsProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<SwapState>({});
+  const [state, setState] = useState<SwapState>(() =>
+    loadJson<SwapState>(STORAGE_KEY, {}),
+  );
+
+  useEffect(() => {
+    saveJson(STORAGE_KEY, state);
+  }, [state]);
 
   const effectiveDay = useCallback(
     (w: number, effD: number) => {
